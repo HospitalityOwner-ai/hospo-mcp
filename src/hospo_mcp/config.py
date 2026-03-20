@@ -13,18 +13,28 @@ class LightspeedConfig:
     """Lightspeed O-Series (formerly Kounta) POS config.
 
     O-Series is the dominant POS in Australian hospitality.
-    Credentials are obtained via OAuth 2.0 — contact developers@kounta.com.
+    Credentials obtained via OAuth 2.0 — contact developers@kounta.com.
     API docs: https://apidoc.kounta.com/
 
-    Note: K-Series (Lightspeed Restaurant) uses a different API and will be
+    Token resolution order for the client:
+      1. Token store  (tokens/{venue_id}.json) — production OAuth flow
+      2. LIGHTSPEED_ACCESS_TOKEN env var        — dev/testing fallback
+      3. No token → mock mode
+
+    Note: LIGHTSPEED_ACCESS_TOKEN is optional if you use the OAuth connect
+    flow (recommended for production). It's kept as a fallback for local dev.
+
+    K-Series (Lightspeed Restaurant) uses a different API and will be
     supported via a separate adapter in a future release.
     """
+    # OAuth app credentials — required to run the /auth/lightspeed flow
+    client_id: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_CLIENT_ID", ""))
+    client_secret: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_CLIENT_SECRET", ""))
+
+    # Dev/testing fallback — not needed in production (use OAuth flow instead)
     access_token: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_ACCESS_TOKEN", ""))
     refresh_token: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_REFRESH_TOKEN", ""))
     site_id: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_SITE_ID", ""))
-    # client_id/secret for OAuth token refresh flow
-    client_id: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_CLIENT_ID", ""))
-    client_secret: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_CLIENT_SECRET", ""))
 
     @property
     def base_url(self) -> str:
@@ -32,7 +42,13 @@ class LightspeedConfig:
 
     @property
     def configured(self) -> bool:
-        return bool(self.access_token and self.site_id)
+        """True if OAuth app is configured (even without a stored token yet)."""
+        return bool(self.client_id and self.client_secret)
+
+    @property
+    def has_token(self) -> bool:
+        """True if a direct access token is available via env (dev mode)."""
+        return bool(self.access_token)
 
 
 @dataclass
@@ -86,10 +102,16 @@ class AppConfig:
     server_version: str = "0.1.0"
 
     def integrations_status(self) -> dict:
+        from .auth.token_store import is_connected
+        ls_connected = is_connected("default")
+        ls_mock = self.use_mock or (
+            not self.lightspeed.has_token and not ls_connected
+        )
         return {
             "lightspeed": {
-                "configured": self.lightspeed.configured,
-                "mock": self.use_mock or not self.lightspeed.configured,
+                "configured": self.lightspeed.configured or ls_connected,
+                "oauth_connected": ls_connected,
+                "mock": ls_mock,
                 "series": "O-Series (Kounta)",
             },
             "xero": {

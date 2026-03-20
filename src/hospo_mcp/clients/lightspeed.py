@@ -6,12 +6,18 @@ OAuth 2.0 credentials: developers@kounta.com
 
 Note: K-Series (Lightspeed Restaurant) is a separate product. For K-Series support,
 a future adapter will be added. O-Series is the primary integration for AU venues.
+
+Token resolution order:
+  1. Token store (tokens/{venue_id}.json) — production OAuth flow
+  2. .env LIGHTSPEED_ACCESS_TOKEN — dev/testing fallback
+  3. No token → mock mode
 """
 
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
 from .base import BaseClient
 from ..config import LightspeedConfig
+from ..auth.token_store import get_valid_access_token, load_tokens
 import structlog
 
 logger = structlog.get_logger()
@@ -171,15 +177,68 @@ class LightspeedClient(BaseClient):
 
     Contact developers@kounta.com for API credentials.
     API docs: https://apidoc.kounta.com/
+
+    Token resolution order:
+      1. Token store (tokens/{venue_id}.json) — production OAuth flow
+      2. .env LIGHTSPEED_ACCESS_TOKEN — dev/testing fallback
+      3. No token → mock mode
     """
 
-    def __init__(self, cfg: LightspeedConfig, use_mock: bool = True):
+    def __init__(
+        self,
+        cfg: LightspeedConfig,
+        use_mock: bool = True,
+        venue_id: str = "default",
+    ):
+        self._cfg = cfg
+        self._venue_id = venue_id
+
+        # Check token store first; fall back to .env token
+        stored = load_tokens(venue_id)
+        token = (stored or {}).get("access_token") or cfg.access_token
+        site_id = (stored or {}).get("site_id") or cfg.site_id or "MOCK_SITE"
+
         super().__init__(
             base_url=cfg.base_url,
-            token=cfg.access_token,
-            use_mock=use_mock or not cfg.configured,
+            token=token,
+            use_mock=use_mock or not bool(token and site_id != "MOCK_SITE"),
         )
-        self.site_id = cfg.site_id or "MOCK_SITE"
+        self.site_id = site_id
+
+    async def _ensure_fresh_token(self) -> None:
+        """Silently refresh the access token if it's expired."""
+        if self._cfg.client_id and self._cfg.client_secret:
+            fresh = await get_valid_access_token(
+                self._venue_id,
+                self._cfg.client_id,
+                self._cfg.client_secret,
+            )
+            if fresh and fresh != self.token:
+                logger.info("lightspeed.token_refreshed", venue_id=self._venue_id)
+                self.token = fresh
+                # Force new httpx client with updated token
+                if self._client:
+                    await self._client.aclose()
+                    self._client = None
+
+    # ------------------------------------------------------------------
+    # Overrides to inject token refresh before real API calls
+    # ------------------------------------------------------------------
+
+    async def get(self, path: str, params: dict = None) -> dict:
+        if not self.use_mock:
+            await self._ensure_fresh_token()
+        return await super().get(path, params)
+
+    async def post(self, path: str, data: dict) -> dict:
+        if not self.use_mock:
+            await self._ensure_fresh_token()
+        return await super().post(path, data)
+
+    async def put(self, path: str, data: dict) -> dict:
+        if not self.use_mock:
+            await self._ensure_fresh_token()
+        return await super().put(path, data)
 
     # ------------------------------------------------------------------
     # Company / venue discovery
