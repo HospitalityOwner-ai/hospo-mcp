@@ -22,14 +22,14 @@ def deputy():
     return DeputyClient(DeputyConfig(), use_mock=True)
 
 
-# ── Lightspeed ────────────────────────────────────────────────────────────────
+# ── Lightspeed O-Series (Kounta) ──────────────────────────────────────────────
 
 class TestLightspeedClient:
     async def test_get_sales_returns_mock_data(self, lightspeed):
         result = await lightspeed.get_sales()
-        assert "Sale" in result
-        assert isinstance(result["Sale"], list)
-        assert len(result["Sale"]) > 0
+        assert "orders" in result
+        assert isinstance(result["orders"], list)
+        assert len(result["orders"]) > 0
         assert result["mock"] is True
 
     async def test_get_sales_summary(self, lightspeed):
@@ -40,23 +40,55 @@ class TestLightspeedClient:
 
     async def test_get_items(self, lightspeed):
         result = await lightspeed.get_items()
-        assert "Item" in result
-        assert len(result["Item"]) > 0
+        assert "products" in result
+        assert len(result["products"]) > 0
 
     async def test_get_items_filtered_by_category(self, lightspeed):
         result = await lightspeed.get_items(category="Food")
-        for item in result["Item"]:
+        for item in result["products"]:
             assert item["category"] == "Food"
 
     async def test_get_categories(self, lightspeed):
         result = await lightspeed.get_categories()
-        assert "Category" in result
-        assert len(result["Category"]) > 0
+        assert "categories" in result
+        assert len(result["categories"]) > 0
+
+    async def test_get_sites(self, lightspeed):
+        result = await lightspeed.get_sites()
+        assert "sites" in result
+        assert len(result["sites"]) > 0
+        # Each site should have an id and name
+        for site in result["sites"]:
+            assert "id" in site
+            assert "name" in site
+
+    async def test_get_company(self, lightspeed):
+        result = await lightspeed.get_company()
+        assert "name" in result
+        assert result["mock"] is True
 
     async def test_update_item_price(self, lightspeed):
-        result = await lightspeed.update_item_price("item_001", 2600)
+        result = await lightspeed.update_item_price("prod_001", 2600)
         assert result["updated"] is True
         assert result["mock"] is True
+
+    async def test_get_item_by_id(self, lightspeed):
+        result = await lightspeed.get_item_by_id("prod_001")
+        assert "product" in result
+        assert result["mock"] is True
+
+    async def test_site_id_defaults_to_mock(self, lightspeed):
+        # site_id should fall back gracefully with no config
+        assert lightspeed.site_id == "MOCK_SITE"
+
+    async def test_config_uses_site_id_not_account_id(self):
+        cfg = LightspeedConfig()
+        # O-Series uses site_id; account_id should not exist
+        assert hasattr(cfg, "site_id")
+        assert not hasattr(cfg, "account_id")
+
+    async def test_base_url_is_kounta(self, lightspeed):
+        assert "kounta.com" in lightspeed.base_url
 
 
 # ── Xero ──────────────────────────────────────────────────────────────────────

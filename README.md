@@ -16,9 +16,10 @@ Connect your AI agents and coding tools (Claude, Cursor, Copilot, GPT-4) directl
 
 | System | Integration | What You Can Do |
 |--------|------------|-----------------|
-| **Lightspeed POS** | ✅ | Sales data, menu items, categories, price updates |
+| **Lightspeed O-Series** (Kounta) | ✅ | Orders, products, categories, sites, price updates |
 | **Xero** | ✅ | P&L, invoices, cash flow, GST, supplier contacts |
 | **Deputy** | ✅ | Roster, timesheets, labour cost, leave management |
+| Lightspeed K-Series *(future adapter)* | 🔜 | Restaurant/K-Series API support |
 | ResDiary *(coming soon)* | 🔜 | Bookings, covers, waitlist |
 | SevenRooms *(coming soon)* | 🔜 | Reservations, guest profiles |
 | MYOB *(coming soon)* | 🔜 | Payroll, BAS |
@@ -67,8 +68,9 @@ Add to your `claude_desktop_config.json`:
       "command": "hospo-mcp",
       "env": {
         "USE_MOCK_DATA": "false",
-        "LIGHTSPEED_ACCESS_TOKEN": "your_token",
-        "LIGHTSPEED_ACCOUNT_ID": "your_account_id",
+        "LIGHTSPEED_ACCESS_TOKEN": "your_oauth_token",
+        "LIGHTSPEED_SITE_ID": "your_site_id",
+        "LIGHTSPEED_BASE_URL": "https://api.kounta.com/v1",
         "XERO_ACCESS_TOKEN": "your_token",
         "XERO_TENANT_ID": "your_tenant_id",
         "DEPUTY_API_KEY": "your_api_key",
@@ -115,16 +117,22 @@ In `.cursor/mcp.json`:
 
 ## Available Tools
 
-### 🍺 Lightspeed POS
+### 🍺 Lightspeed O-Series (Kounta)
+
+> **O-Series** (formerly Kounta, acquired by Lightspeed in 2019) is the dominant POS in
+> Australian hospitality. The API lives at `api.kounta.com` and uses OAuth 2.0 Bearer tokens.
+> Contact [developers@kounta.com](mailto:developers@kounta.com) for credentials.
+> [API docs →](https://apidoc.kounta.com/)
 
 | Tool | Description |
 |------|-------------|
-| `get_sales` | Transactions for a date range |
+| `get_sales` | Orders for a date range (optionally scoped to a site) |
 | `get_sales_summary` | Aggregated daily summary (revenue, transactions, hourly breakdown) |
-| `get_menu_items` | Menu items with prices and categories |
+| `get_menu_items` | Products with prices and categories |
 | `get_sales_categories` | Revenue by category |
-| `get_menu_item` | Single item by ID |
-| `update_item_price` | Update item price ⚠️ writes |
+| `get_menu_item` | Single product by ID |
+| `get_sites` | All sites/venues for the company |
+| `update_item_price` | Update product price ⚠️ writes |
 
 ### 💰 Xero
 
@@ -211,10 +219,14 @@ Once connected, you can ask your AI:
 
 ## API Setup Guides
 
-### Lightspeed
-1. Create an app at [cloud.lightspeedapp.com](https://cloud.lightspeedapp.com/oauth/authorize)
-2. Complete OAuth flow to get access/refresh tokens
-3. Find your Account ID in the Lightspeed dashboard URL
+### Lightspeed O-Series (Kounta)
+1. Contact [developers@kounta.com](mailto:developers@kounta.com) to get OAuth credentials
+2. Complete the OAuth 2.0 flow to obtain an access token and refresh token
+3. Find your Site ID in the O-Series back office (each venue has its own site ID)
+4. Set `LIGHTSPEED_ACCESS_TOKEN`, `LIGHTSPEED_SITE_ID`, and `LIGHTSPEED_BASE_URL=https://api.kounta.com/v1` in your `.env`
+
+> **K-Series users:** Lightspeed K-Series (Restaurant) uses a separate API at `api.lightspeedapp.com`.
+> A K-Series adapter is planned for a future release.
 
 ### Xero
 1. Create an app at [developer.xero.com](https://developer.xero.com/app/manage)

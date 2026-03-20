@@ -10,23 +10,29 @@ load_dotenv()
 
 @dataclass
 class LightspeedConfig:
-    """Lightspeed Restaurant / Lightspeed Retail (K-Series) config."""
-    client_id: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_CLIENT_ID", ""))
-    client_secret: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_CLIENT_SECRET", ""))
+    """Lightspeed O-Series (formerly Kounta) POS config.
+
+    O-Series is the dominant POS in Australian hospitality.
+    Credentials are obtained via OAuth 2.0 — contact developers@kounta.com.
+    API docs: https://apidoc.kounta.com/
+
+    Note: K-Series (Lightspeed Restaurant) uses a different API and will be
+    supported via a separate adapter in a future release.
+    """
     access_token: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_ACCESS_TOKEN", ""))
     refresh_token: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_REFRESH_TOKEN", ""))
-    account_id: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_ACCOUNT_ID", ""))
-    sandbox: bool = field(default_factory=lambda: os.getenv("LIGHTSPEED_SANDBOX", "true").lower() == "true")
+    site_id: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_SITE_ID", ""))
+    # client_id/secret for OAuth token refresh flow
+    client_id: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_CLIENT_ID", ""))
+    client_secret: str = field(default_factory=lambda: os.getenv("LIGHTSPEED_CLIENT_SECRET", ""))
 
     @property
     def base_url(self) -> str:
-        if self.sandbox:
-            return "https://sandbox.lightspeedapp.com/API/V3"
-        return "https://api.lightspeedapp.com/API/V3"
+        return os.getenv("LIGHTSPEED_BASE_URL", "https://api.kounta.com/v1")
 
     @property
     def configured(self) -> bool:
-        return bool(self.access_token and self.account_id)
+        return bool(self.access_token and self.site_id)
 
 
 @dataclass
@@ -84,6 +90,7 @@ class AppConfig:
             "lightspeed": {
                 "configured": self.lightspeed.configured,
                 "mock": self.use_mock or not self.lightspeed.configured,
+                "series": "O-Series (Kounta)",
             },
             "xero": {
                 "configured": self.xero.configured,
