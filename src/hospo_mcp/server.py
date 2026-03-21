@@ -19,6 +19,7 @@ from .clients.deputy import DeputyClient
 from .tools.lightspeed_tools import register_lightspeed_tools
 from .tools.xero_tools import register_xero_tools
 from .tools.deputy_tools import register_deputy_tools
+from .tools.nl_query_tool import register_nl_query_tool
 from .resources.hospo_resources import register_resources
 from .prompts.hospo_prompts import register_prompts
 
@@ -72,6 +73,7 @@ Always confirm before making write operations (price changes, invoice creation, 
     register_lightspeed_tools(mcp, lightspeed_client)
     register_xero_tools(mcp, xero_client)
     register_deputy_tools(mcp, deputy_client)
+    register_nl_query_tool(mcp, lightspeed_client)
 
     # Register resources
     register_resources(mcp, lightspeed_client, xero_client, deputy_client, config)
